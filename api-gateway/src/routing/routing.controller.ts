@@ -21,6 +21,7 @@ export class RoutingController {
 
   @Post('route')
   async findRoute(@Body(ValidationPipe) dto: RouteRequestDto) {
+    console.log('find route dto', dto)
     try {
       const result = await firstValueFrom(
         this.routingClient.send('find_route', dto).pipe(

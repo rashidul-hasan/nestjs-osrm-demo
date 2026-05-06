@@ -1,0 +1,18 @@
+{
+  "name": "nestjs-osrm-demo-root",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "api-gateway",
+    "routing-service"
+  ],
+  "scripts": {
+    "start": "concurrently \"npm run start --workspace=api-gateway\" \"npm run start --workspace=routing-service\"",
+    "start:dev": "concurrently \"npm run start:dev --prefix=api-gateway\" \"npm run start:dev --prefix=routing-service\"",
+    "build": "npm run build --workspaces",
+    "install-all": "npm install && cd api-gateway && npm install && cd ../routing-service && npm install"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}
