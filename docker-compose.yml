@@ -13,7 +13,7 @@ services:
       - "5000:5000"
     volumes:
       - ./data:/data
-    command: "osrm-routed --algorithm mld /data/monaco-latest.osrm"
+    command: "osrm-routed --algorithm mld /data/monaco-260505.osm"
     networks:
       - delivery-net
     healthcheck:
@@ -44,9 +44,9 @@ services:
       - OSRM_URL=http://osrm-backend:5000
       - NOMINATIM_URL=https://nominatim.openstreetmap.org
       - NODE_ENV=development
-    depends_on:
-      osrm-backend:
-        condition: service_healthy
+    # depends_on:
+    #   osrm-backend:
+    #     condition: service_healthy
     networks:
       - delivery-net
 

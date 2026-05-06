@@ -116,6 +116,9 @@ This demo is a practical starting point for developers building:
 - `curl` (for the OSRM data download script)
 - ~500 MB disk space for the Monaco OSM dataset
 
+> Please download the OSM dataset for your country or region from [Geofabrik](https://download.geofabrik.de/) and place it in the `data` folder.
+> extract data: `docker run -t -v "${PWD}:/data" osrm/osrm-backend osrm-extract -p /opt/car.lua /data/<file name>.osm.pbf`
+
 > **No Node.js required on your host** to run via Docker. For local development outside Docker, Node.js ≥ 18 is needed.
 
 ---
