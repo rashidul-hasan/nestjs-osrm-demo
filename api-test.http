@@ -1,0 +1,173 @@
+### ====================================================
+### OSRM Delivery Demo — API Tests
+### Monaco coordinates are used (our OSRM dataset region)
+### Monaco Center: lat=43.7384, lon=7.4246
+### Monte Carlo:   lat=43.7396, lon=7.4278
+### Fontvieille:   lat=43.7269, lon=7.4147
+### Port Hercules: lat=43.7370, lon=7.4269
+### ====================================================
+
+@base = http://localhost:3000
+
+### ─────────────────────────────────────────────────────
+### ROUTING ENDPOINTS
+### ─────────────────────────────────────────────────────
+
+### 1. Find best driving route between two points
+POST {{base}}/routing/route
+Content-Type: application/json
+
+{
+  "origin": { "lat": 43.7384, "lon": 7.4246 },
+  "destination": { "lat": 43.7396, "lon": 7.4278 },
+  "profile": "driving",
+  "steps": true
+}
+
+###
+
+### 2. Find cycling route (for bicycle delivery)
+POST {{base}}/routing/route
+Content-Type: application/json
+
+{
+  "origin": { "lat": 43.7384, "lon": 7.4246 },
+  "destination": { "lat": 43.7269, "lon": 7.4147 },
+  "profile": "cycling",
+  "steps": true
+}
+
+###
+
+### 3. Find nearest road/snapped point to coordinates
+POST {{base}}/routing/nearest
+Content-Type: application/json
+
+{
+  "lat": 43.7384,
+  "lon": 7.4246,
+  "profile": "driving"
+}
+
+###
+
+### 4. Geocode an address (uses Nominatim)
+POST {{base}}/routing/geocode
+Content-Type: application/json
+
+{
+  "address": "Monte Carlo, Monaco"
+}
+
+###
+
+### 5. Reverse geocode coordinates to address
+POST {{base}}/routing/reverse-geocode
+Content-Type: application/json
+
+{
+  "lat": 43.7396,
+  "lon": 7.4278
+}
+
+###
+
+### 6. Distance/duration matrix (multiple points)
+POST {{base}}/routing/table
+Content-Type: application/json
+
+{
+  "coordinates": [
+    { "lat": 43.7384, "lon": 7.4246 },
+    { "lat": 43.7396, "lon": 7.4278 },
+    { "lat": 43.7269, "lon": 7.4147 }
+  ],
+  "profile": "driving"
+}
+
+###
+
+### ─────────────────────────────────────────────────────
+### DELIVERY ENDPOINTS
+### ─────────────────────────────────────────────────────
+
+### 7. Get all available vehicle types with fees
+GET {{base}}/delivery/vehicle-types
+
+###
+
+### 8. Estimate delivery with MOTORBIKE
+POST {{base}}/delivery/estimate
+Content-Type: application/json
+
+{
+  "origin": { "lat": 43.7384, "lon": 7.4246 },
+  "destination": { "lat": 43.7269, "lon": 7.4147 },
+  "vehicleType": "motorbike",
+  "currency": "BDT"
+}
+
+###
+
+### 9. Estimate delivery with CAR
+POST {{base}}/delivery/estimate
+Content-Type: application/json
+
+{
+  "origin": { "lat": 43.7384, "lon": 7.4246 },
+  "destination": { "lat": 43.7269, "lon": 7.4147 },
+  "vehicleType": "car",
+  "currency": "BDT"
+}
+
+###
+
+### 10. Estimate delivery with BICYCLE
+POST {{base}}/delivery/estimate
+Content-Type: application/json
+
+{
+  "origin": { "lat": 43.7384, "lon": 7.4246 },
+  "destination": { "lat": 43.7269, "lon": 7.4147 },
+  "vehicleType": "bicycle",
+  "currency": "BDT"
+}
+
+###
+
+### 11. Estimate delivery with SCOOTER
+POST {{base}}/delivery/estimate
+Content-Type: application/json
+
+{
+  "origin": { "lat": 43.7384, "lon": 7.4246 },
+  "destination": { "lat": 43.7269, "lon": 7.4147 },
+  "vehicleType": "scooter",
+  "currency": "BDT"
+}
+
+###
+
+### 12. Estimate delivery with TRUCK
+POST {{base}}/delivery/estimate
+Content-Type: application/json
+
+{
+  "origin": { "lat": 43.7384, "lon": 7.4246 },
+  "destination": { "lat": 43.7269, "lon": 7.4147 },
+  "vehicleType": "truck",
+  "currency": "BDT"
+}
+
+###
+
+### 13. Compare ALL vehicle types for a route (sorted by price)
+POST {{base}}/delivery/compare
+Content-Type: application/json
+
+{
+  "origin": { "lat": 43.7384, "lon": 7.4246 },
+  "destination": { "lat": 43.7269, "lon": 7.4147 }
+}
+
+###

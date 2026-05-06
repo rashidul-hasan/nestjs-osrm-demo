@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>🚀 OSRM Delivery Simulator</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Segoe UI', system-ui, sans-serif; background: #0f1117; color: #e2e8f0; height: 100vh; display: flex; flex-direction: column; }
+
+    /* Header */
+    header {
+      background: linear-gradient(135deg, #1a1f2e, #252d3d);
+      border-bottom: 1px solid #2d3748;
+      padding: 12px 20px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-shrink: 0;
+    }
+    header h1 { font-size: 1.3rem; font-weight: 700; color: #63b3ed; }
+    header .badge {
+      background: #2d3748;
+      border: 1px solid #4a5568;
+      border-radius: 20px;
+      padding: 2px 10px;
+      font-size: 0.72rem;
+      color: #a0aec0;
+    }
+    .ws-status {
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.8rem;
+    }
+    .ws-dot { width: 8px; height: 8px; border-radius: 50%; background: #fc8181; }
+    .ws-dot.connected { background: #68d391; animation: pulse 2s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
+
+    /* Layout */
+    .main-layout {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    /* Sidebar */
+    .sidebar {
+      width: 360px;
+      flex-shrink: 0;
+      background: #1a1f2e;
+      border-right: 1px solid #2d3748;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+    }
+    .sidebar-section {
+      padding: 16px;
+      border-bottom: 1px solid #2d3748;
+    }
+    .sidebar-section h3 {
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #718096;
+      margin-bottom: 12px;
+    }
+
+    /* Form inputs */
+    .form-group { margin-bottom: 10px; }
+    .form-group label { display: block; font-size: 0.8rem; color: #a0aec0; margin-bottom: 4px; }
+    .coord-row { display: flex; gap: 6px; }
+    .coord-row input { flex: 1; }
+    input[type="number"], input[type="text"] {
+      width: 100%;
+      background: #252d3d;
+      border: 1px solid #2d3748;
+      border-radius: 6px;
+      padding: 7px 10px;
+      color: #e2e8f0;
+      font-size: 0.85rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    input:focus { border-color: #63b3ed; }
+
+    /* Vehicle selector */
+    .vehicle-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 6px;
+    }
+    .vehicle-btn {
+      background: #252d3d;
+      border: 2px solid #2d3748;
+      border-radius: 8px;
+      padding: 8px 4px;
+      cursor: pointer;
+      text-align: center;
+      transition: all 0.2s;
+      color: #e2e8f0;
+    }
+    .vehicle-btn:hover { border-color: #4a90d9; background: #2d3748; }
+    .vehicle-btn.active { border-color: #63b3ed; background: #1e3a5f; }
+    .vehicle-btn .icon { font-size: 1.4rem; display: block; }
+    .vehicle-btn .label { font-size: 0.7rem; margin-top: 3px; color: #a0aec0; }
+
+    /* Buttons */
+    .btn {
+      width: 100%;
+      padding: 10px 16px;
+      border: none;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .btn-primary { background: #3182ce; color: white; }
+    .btn-primary:hover { background: #2b6cb0; }
+    .btn-primary:disabled { background: #2d3748; color: #718096; cursor: not-allowed; }
+    .btn-danger { background: #e53e3e; color: white; margin-top: 6px; }
+    .btn-danger:hover { background: #c53030; }
+    .btn-secondary { background: #2d3748; color: #e2e8f0; border: 1px solid #4a5568; }
+    .btn-secondary:hover { background: #4a5568; }
+
+    /* Stats panel */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+    .stat-card {
+      background: #252d3d;
+      border: 1px solid #2d3748;
+      border-radius: 8px;
+      padding: 10px;
+    }
+    .stat-card .stat-label { font-size: 0.7rem; color: #718096; text-transform: uppercase; letter-spacing: 0.05em; }
+    .stat-card .stat-value { font-size: 1.1rem; font-weight: 700; color: #e2e8f0; margin-top: 3px; }
+    .stat-card .stat-value.highlight { color: #68d391; }
+    .stat-card .stat-value.fee { color: #f6e05e; }
+
+    /* Progress */
+    .progress-wrap { margin-top: 10px; }
+    .progress-label { font-size: 0.75rem; color: #a0aec0; margin-bottom: 5px; display: flex; justify-content: space-between; }
+    .progress-bar-bg { background: #2d3748; border-radius: 4px; height: 6px; overflow: hidden; }
+    .progress-bar { height: 100%; background: linear-gradient(90deg, #3182ce, #63b3ed); border-radius: 4px; transition: width 0.3s; width: 0%; }
+
+    /* Log */
+    .event-log {
+      flex: 1;
+      padding: 10px;
+      overflow-y: auto;
+      background: #0d1117;
+      font-family: 'Courier New', monospace;
+      font-size: 0.75rem;
+    }
+    .log-entry { padding: 3px 0; border-bottom: 1px solid #1a1f2e; }
+    .log-entry .ts { color: #4a5568; margin-right: 6px; }
+    .log-entry.info .msg { color: #63b3ed; }
+    .log-entry.success .msg { color: #68d391; }
+    .log-entry.warn .msg { color: #f6e05e; }
+    .log-entry.error .msg { color: #fc8181; }
+    .log-entry.data .msg { color: #9f7aea; }
+
+    /* Map */
+    #map { flex: 1; }
+
+    /* Quick presets */
+    .preset-btns { display: flex; gap: 6px; flex-wrap: wrap; }
+    .preset-btn {
+      background: #252d3d;
+      border: 1px solid #2d3748;
+      border-radius: 6px;
+      padding: 5px 10px;
+      font-size: 0.72rem;
+      cursor: pointer;
+      color: #a0aec0;
+      transition: all 0.15s;
+    }
+    .preset-btn:hover { background: #2d3748; color: #e2e8f0; border-color: #4a5568; }
+
+    /* Fee breakdown */
+    .fee-breakdown {
+      background: #252d3d;
+      border: 1px solid #2d3748;
+      border-radius: 8px;
+      padding: 10px;
+      font-size: 0.78rem;
+      color: #a0aec0;
+      line-height: 1.6;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>🚀 OSRM Delivery Simulator</h1>
+  <span class="badge">Monaco Dataset</span>
+  <span class="badge">NestJS Microservices</span>
+  <div class="ws-status">
+    <div class="ws-dot" id="wsDot"></div>
+    <span id="wsStatusText">Disconnected</span>
+  </div>
+</header>
+
+<div class="main-layout">
+  <!-- Sidebar -->
+  <div class="sidebar">
+
+    <!-- Quick Presets -->
+    <div class="sidebar-section">
+      <h3>📍 Quick Presets (Monaco)</h3>
+      <div class="preset-btns">
+        <button class="preset-btn" onclick="applyPreset('center-mc')">Center → Monte Carlo</button>
+        <button class="preset-btn" onclick="applyPreset('center-font')">Center → Fontvieille</button>
+        <button class="preset-btn" onclick="applyPreset('port-casino')">Port → Casino</button>
+      </div>
+    </div>
+
+    <!-- Route Config -->
+    <div class="sidebar-section">
+      <h3>🗺️ Route Configuration</h3>
+
+      <div class="form-group">
+        <label>Origin (Pickup)</label>
+        <div class="coord-row">
+          <input type="number" id="originLat" placeholder="Lat" step="0.0001" value="43.7384" />
+          <input type="number" id="originLon" placeholder="Lon" step="0.0001" value="7.4246" />
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Destination (Dropoff)</label>
+        <div class="coord-row">
+          <input type="number" id="destLat" placeholder="Lat" step="0.0001" value="43.7269" />
+          <input type="number" id="destLon" placeholder="Lon" step="0.0001" value="7.4147" />
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Speed Factor (simulation only)</label>
+        <input type="number" id="speedFactor" value="30" min="1" max="200" step="1" title="How many times faster than real-time to simulate" />
+      </div>
+    </div>
+
+    <!-- Vehicle Selection -->
+    <div class="sidebar-section">
+      <h3>🚗 Vehicle Type</h3>
+      <div class="vehicle-grid">
+        <div class="vehicle-btn active" data-type="motorbike" onclick="selectVehicle(this)">
+          <span class="icon">🏍️</span>
+          <span class="label">Motorbike</span>
+        </div>
+        <div class="vehicle-btn" data-type="car" onclick="selectVehicle(this)">
+          <span class="icon">🚗</span>
+          <span class="label">Car</span>
+        </div>
+        <div class="vehicle-btn" data-type="bicycle" onclick="selectVehicle(this)">
+          <span class="icon">🚲</span>
+          <span class="label">Bicycle</span>
+        </div>
+        <div class="vehicle-btn" data-type="scooter" onclick="selectVehicle(this)">
+          <span class="icon">🛵</span>
+          <span class="label">Scooter</span>
+        </div>
+        <div class="vehicle-btn" data-type="truck" onclick="selectVehicle(this)">
+          <span class="icon">🚚</span>
+          <span class="label">Truck</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Actions -->
+    <div class="sidebar-section">
+      <h3>⚡ Actions</h3>
+      <button class="btn btn-primary" id="startBtn" onclick="startSimulation()">▶ Start Delivery Simulation</button>
+      <button class="btn btn-danger" id="stopBtn" onclick="stopSimulation()" style="display:none">⏹ Stop Simulation</button>
+      <button class="btn btn-secondary" style="margin-top:6px" onclick="fetchRoute()">📍 Preview Route Only</button>
+      <button class="btn btn-secondary" style="margin-top:6px" onclick="compareVehicles()">⚖️ Compare All Vehicles</button>
+    </div>
+
+    <!-- Live Stats -->
+    <div class="sidebar-section">
+      <h3>📊 Live Stats</h3>
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-label">Distance</div>
+          <div class="stat-value" id="statDistance">—</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">ETA</div>
+          <div class="stat-value highlight" id="statEta">—</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Delivery Fee</div>
+          <div class="stat-value fee" id="statFee">—</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Remaining</div>
+          <div class="stat-value" id="statRemaining">—</div>
+        </div>
+      </div>
+      <div class="progress-wrap">
+        <div class="progress-label">
+          <span>Progress</span>
+          <span id="progressPct">0%</span>
+        </div>
+        <div class="progress-bar-bg">
+          <div class="progress-bar" id="progressBar"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Fee Breakdown -->
+    <div class="sidebar-section" id="feeSection" style="display:none">
+      <h3>💰 Fee Breakdown</h3>
+      <div class="fee-breakdown" id="feeBreakdown"></div>
+    </div>
+
+    <!-- Event Log -->
+    <div class="sidebar-section" style="flex:1;display:flex;flex-direction:column;min-height:150px">
+      <h3>📋 Event Log</h3>
+    </div>
+    <div class="event-log" id="eventLog"></div>
+  </div>
+
+  <!-- Map -->
+  <div id="map"></div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+<script>
+  // ──────────────────────────────────────────────────
+  // State
+  // ──────────────────────────────────────────────────
+  let socket = null;
+  let selectedVehicle = 'motorbike';
+  let routeLayer = null;
+  let vehicleMarker = null;
+  let originMarker = null;
+  let destMarker = null;
+  let isSimulating = false;
+
+  const GATEWAY_URL = 'http://localhost:3000';
+
+  // ──────────────────────────────────────────────────
+  // Map init — Monaco
+  // ──────────────────────────────────────────────────
+  const map = L.map('map').setView([43.7384, 7.4246], 14);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap contributors',
+    maxZoom: 19,
+  }).addTo(map);
+
+  // Custom icons
+  const makeIcon = (emoji, color) => L.divIcon({
+    html: `<div style="font-size:22px;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.5))">${emoji}</div>`,
+    className: '',
+    iconSize: [30, 30],
+    iconAnchor: [15, 15],
+  });
+
+  const VEHICLE_ICONS = { car:'🚗', motorbike:'🏍️', bicycle:'🚲', scooter:'🛵', truck:'🚚' };
+
+  // ──────────────────────────────────────────────────
+  // WebSocket Connection
+  // ──────────────────────────────────────────────────
+  function connectWebSocket() {
+    socket = io(`${GATEWAY_URL}/delivery`, { transports: ['websocket', 'polling'] });
+
+    socket.on('connect', () => {
+      setWsStatus(true);
+      log('WebSocket connected to API Gateway', 'success');
+    });
+
+    socket.on('disconnect', () => {
+      setWsStatus(false);
+      log('WebSocket disconnected', 'warn');
+    });
+
+    socket.on('connected', (data) => {
+      log(`Server: ${data.message} (ID: ${data.clientId})`, 'info');
+    });
+
+    socket.on('simulation_status', (data) => {
+      log(`Status: ${data.message}`, 'info');
+    });
+
+    socket.on('simulation_started', (data) => {
+      isSimulating = true;
+      document.getElementById('startBtn').disabled = true;
+      document.getElementById('stopBtn').style.display = 'block';
+
+      const est = data.estimate;
+      updateStats(est);
+      drawRoute(est.route.geometry.coordinates);
+      placeMarkers(est.origin, est.destination);
+
+      // Show fee breakdown
+      const fb = document.getElementById('feeSection');
+      fb.style.display = 'block';
+      document.getElementById('feeBreakdown').textContent = est.deliveryFee.breakdown;
+
+      log(`Simulation started! ${est.vehicleInfo.icon} ${est.vehicleInfo.name} | ${est.route.distance_km} km | ETA: ${est.adjustedDurationMinutes} min | Fee: ${est.deliveryFee.currency} ${est.deliveryFee.totalFee}`, 'success');
+    });
+
+    socket.on('delivery_location_update', (data) => {
+      const { currentLocation, progress, remainingMinutes, vehicleType } = data;
+      updateVehicleMarker(currentLocation.lat, currentLocation.lon, vehicleType);
+
+      document.getElementById('progressBar').style.width = progress + '%';
+      document.getElementById('progressPct').textContent = progress + '%';
+      document.getElementById('statRemaining').textContent = remainingMinutes + ' min';
+    });
+
+    socket.on('delivery_completed', (data) => {
+      isSimulating = false;
+      document.getElementById('startBtn').disabled = false;
+      document.getElementById('stopBtn').style.display = 'none';
+      document.getElementById('progressBar').style.width = '100%';
+      document.getElementById('progressPct').textContent = '100%';
+      document.getElementById('statRemaining').textContent = '0 min';
+      log('✅ Delivery completed!', 'success');
+    });
+
+    socket.on('simulation_error', (data) => {
+      isSimulating = false;
+      document.getElementById('startBtn').disabled = false;
+      document.getElementById('stopBtn').style.display = 'none';
+      log('Error: ' + data.message, 'error');
+    });
+
+    socket.on('pong', (data) => {
+      log(`Pong received at ${data.timestamp}`, 'data');
+    });
+  }
+
+  // ──────────────────────────────────────────────────
+  // Actions
+  // ──────────────────────────────────────────────────
+  function startSimulation() {
+    if (!socket || !socket.connected) {
+      log('WebSocket not connected — reconnecting...', 'warn');
+      connectWebSocket();
+      setTimeout(startSimulation, 1000);
+      return;
+    }
+
+    const payload = {
+      origin: { lat: parseFloat(document.getElementById('originLat').value), lon: parseFloat(document.getElementById('originLon').value) },
+      destination: { lat: parseFloat(document.getElementById('destLat').value), lon: parseFloat(document.getElementById('destLon').value) },
+      vehicleType: selectedVehicle,
+      speedFactor: parseInt(document.getElementById('speedFactor').value) || 30,
+    };
+
+    log(`Requesting simulation: ${selectedVehicle} from [${payload.origin.lat},${payload.origin.lon}] to [${payload.destination.lat},${payload.destination.lon}]`, 'info');
+    socket.emit('simulate_delivery', payload);
+    clearRoute();
+  }
+
+  function stopSimulation() {
+    if (socket) socket.emit('stop_simulation');
+    isSimulating = false;
+    document.getElementById('startBtn').disabled = false;
+    document.getElementById('stopBtn').style.display = 'none';
+    log('Simulation stopped by user', 'warn');
+  }
+
+  async function fetchRoute() {
+    const origin = { lat: parseFloat(document.getElementById('originLat').value), lon: parseFloat(document.getElementById('originLon').value) };
+    const destination = { lat: parseFloat(document.getElementById('destLat').value), lon: parseFloat(document.getElementById('destLon').value) };
+    const profile = (selectedVehicle === 'bicycle') ? 'cycling' : 'driving';
+
+    log(`Fetching ${profile} route via REST API...`, 'info');
+    try {
+      const res = await fetch(`${GATEWAY_URL}/routing/route`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ origin, destination, profile }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        const r = json.data;
+        drawRoute(r.geometry.coordinates);
+        placeMarkers(origin, destination);
+        document.getElementById('statDistance').textContent = r.distance_km + ' km';
+        document.getElementById('statEta').textContent = r.duration_minutes + ' min';
+        log(`Route: ${r.distance_km} km, ${r.duration_minutes} min, ${r.legs[0]?.steps?.length || 0} steps`, 'success');
+      } else {
+        log('Route error: ' + JSON.stringify(json), 'error');
+      }
+    } catch (err) {
+      log('Fetch error: ' + err.message, 'error');
+    }
+  }
+
+  async function compareVehicles() {
+    const origin = { lat: parseFloat(document.getElementById('originLat').value), lon: parseFloat(document.getElementById('originLon').value) };
+    const destination = { lat: parseFloat(document.getElementById('destLat').value), lon: parseFloat(document.getElementById('destLon').value) };
+    log('Comparing all vehicles...', 'info');
+    try {
+      const res = await fetch(`${GATEWAY_URL}/delivery/compare`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ origin, destination }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        json.data.forEach((est) => {
+          log(`${est.vehicleInfo.icon} ${est.vehicleInfo.name}: ${est.route.distance_km} km | ${est.adjustedDurationMinutes} min | BDT ${est.deliveryFee.totalFee}`, 'data');
+        });
+      }
+    } catch (err) {
+      log('Compare error: ' + err.message, 'error');
+    }
+  }
+
+  // ──────────────────────────────────────────────────
+  // Map helpers
+  // ──────────────────────────────────────────────────
+  function drawRoute(coords) {
+    clearRoute();
+    // coords are [lon, lat] from GeoJSON — convert to [lat, lon] for Leaflet
+    const latLngs = coords.map(([lon, lat]) => [lat, lon]);
+    routeLayer = L.polyline(latLngs, { color: '#63b3ed', weight: 5, opacity: 0.85 }).addTo(map);
+    map.fitBounds(routeLayer.getBounds(), { padding: [40, 40] });
+  }
+
+  function clearRoute() {
+    if (routeLayer) { map.removeLayer(routeLayer); routeLayer = null; }
+    if (vehicleMarker) { map.removeLayer(vehicleMarker); vehicleMarker = null; }
+    document.getElementById('progressBar').style.width = '0%';
+    document.getElementById('progressPct').textContent = '0%';
+  }
+
+  function placeMarkers(origin, dest) {
+    if (originMarker) map.removeLayer(originMarker);
+    if (destMarker) map.removeLayer(destMarker);
+    originMarker = L.marker([origin.lat, origin.lon], { icon: makeIcon('📦') })
+      .addTo(map).bindPopup('📦 Pickup Point');
+    destMarker = L.marker([dest.lat, dest.lon], { icon: makeIcon('🏁') })
+      .addTo(map).bindPopup('🏁 Destination');
+  }
+
+  function updateVehicleMarker(lat, lon, vehicleType) {
+    const icon = makeIcon(VEHICLE_ICONS[vehicleType] || '🚗');
+    if (!vehicleMarker) {
+      vehicleMarker = L.marker([lat, lon], { icon }).addTo(map);
+    } else {
+      vehicleMarker.setLatLng([lat, lon]);
+      vehicleMarker.setIcon(icon);
+    }
+  }
+
+  // ──────────────────────────────────────────────────
+  // UI helpers
+  // ──────────────────────────────────────────────────
+  function selectVehicle(el) {
+    document.querySelectorAll('.vehicle-btn').forEach(b => b.classList.remove('active'));
+    el.classList.add('active');
+    selectedVehicle = el.dataset.type;
+    log(`Vehicle selected: ${VEHICLE_ICONS[selectedVehicle]} ${selectedVehicle}`, 'info');
+  }
+
+  function updateStats(est) {
+    document.getElementById('statDistance').textContent = est.route.distance_km + ' km';
+    document.getElementById('statEta').textContent = est.adjustedDurationMinutes + ' min';
+    document.getElementById('statFee').textContent = `${est.deliveryFee.currency} ${est.deliveryFee.totalFee}`;
+    document.getElementById('statRemaining').textContent = est.adjustedDurationMinutes + ' min';
+  }
+
+  function setWsStatus(connected) {
+    document.getElementById('wsDot').className = 'ws-dot' + (connected ? ' connected' : '');
+    document.getElementById('wsStatusText').textContent = connected ? 'Connected' : 'Disconnected';
+  }
+
+  function log(msg, type = 'info') {
+    const el = document.getElementById('eventLog');
+    const ts = new Date().toLocaleTimeString();
+    const div = document.createElement('div');
+    div.className = `log-entry ${type}`;
+    div.innerHTML = `<span class="ts">[${ts}]</span><span class="msg">${msg}</span>`;
+    el.prepend(div);
+    // Keep max 100 entries
+    while (el.children.length > 100) el.removeChild(el.lastChild);
+  }
+
+  function applyPreset(name) {
+    const presets = {
+      'center-mc':   { oLat: 43.7384, oLon: 7.4246, dLat: 43.7396, dLon: 7.4278 },
+      'center-font': { oLat: 43.7384, oLon: 7.4246, dLat: 43.7269, dLon: 7.4147 },
+      'port-casino': { oLat: 43.7370, oLon: 7.4269, dLat: 43.7396, dLon: 7.4278 },
+    };
+    const p = presets[name];
+    if (!p) return;
+    document.getElementById('originLat').value = p.oLat;
+    document.getElementById('originLon').value = p.oLon;
+    document.getElementById('destLat').value = p.dLat;
+    document.getElementById('destLon').value = p.dLon;
+    log(`Preset applied: ${name}`, 'info');
+  }
+
+  // ──────────────────────────────────────────────────
+  // Map click to set origin/dest
+  // ──────────────────────────────────────────────────
+  let clickMode = 'origin';
+  map.on('click', (e) => {
+    const { lat, lng } = e.latlng;
+    if (clickMode === 'origin') {
+      document.getElementById('originLat').value = lat.toFixed(4);
+      document.getElementById('originLon').value = lng.toFixed(4);
+      log(`Origin set by click: [${lat.toFixed(4)}, ${lng.toFixed(4)}]`, 'info');
+      clickMode = 'dest';
+    } else {
+      document.getElementById('destLat').value = lat.toFixed(4);
+      document.getElementById('destLon').value = lng.toFixed(4);
+      log(`Destination set by click: [${lat.toFixed(4)}, ${lng.toFixed(4)}]`, 'info');
+      clickMode = 'origin';
+    }
+  });
+
+  // ──────────────────────────────────────────────────
+  // Init
+  // ──────────────────────────────────────────────────
+  connectWebSocket();
+  log('App initialized. Click map to set origin/destination, or use presets.', 'info');
+  log('Tip: First click = origin 📦, Second click = destination 🏁', 'info');
+</script>
+</body>
+</html>

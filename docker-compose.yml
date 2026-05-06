@@ -1,0 +1,79 @@
+version: "3.8"
+
+services:
+  # ─────────────────────────────────────────────
+  # OSRM Backend — routes driving/cycling queries
+  # ─────────────────────────────────────────────
+  osrm-backend:
+    platform: linux/amd64
+    image: ghcr.io/project-osrm/osrm-backend
+    container_name: osrm-backend
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./data:/data
+    command: "osrm-routed --algorithm mld /data/monaco-latest.osrm"
+    networks:
+      - delivery-net
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--quiet",
+          "--tries=1",
+          "--spider",
+          "http://localhost:5000/nearest/v1/driving/7.4246,43.7384",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # ─────────────────────────────────────────────
+  # Routing Microservice — TCP on port 3001
+  # ─────────────────────────────────────────────
+  routing-service:
+    build:
+      context: ./routing-service
+      dockerfile: Dockerfile
+    container_name: routing-service
+    restart: unless-stopped
+    environment:
+      - PORT=3001
+      - OSRM_URL=http://osrm-backend:5000
+      - NOMINATIM_URL=https://nominatim.openstreetmap.org
+      - NODE_ENV=development
+    depends_on:
+      osrm-backend:
+        condition: service_healthy
+    networks:
+      - delivery-net
+
+  # ─────────────────────────────────────────────
+  # API Gateway — HTTP + WebSocket on port 3000
+  # ─────────────────────────────────────────────
+  api-gateway:
+    build:
+      context: ./api-gateway
+      dockerfile: Dockerfile
+    container_name: api-gateway
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+      - ROUTING_SERVICE_HOST=routing-service
+      - ROUTING_SERVICE_PORT=3001
+      - STATIC_DIR=/app/public
+      - NODE_ENV=development
+    depends_on:
+      - routing-service
+    networks:
+      - delivery-net
+    volumes:
+      - ./public:/app/public
+
+networks:
+  delivery-net:
+    driver: bridge
